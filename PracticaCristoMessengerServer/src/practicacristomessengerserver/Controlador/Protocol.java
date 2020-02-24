@@ -5,9 +5,16 @@
  */
 package practicacristomessengerserver.Controlador;
 
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import practicacristomessengerserver.MainWindow;
 import practicacristomessengerserver.Modelo.Message;
 import practicacristomessengerserver.Modelo.User;
@@ -20,14 +27,19 @@ public class Protocol {
     private static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
     private String dateTime = "";
     private final String protocolVersion = "PROTOCOLCRISTOMESSENGER1.0";
-    private String username = "";
-    private String password = "";
+    public String username = "";
     private ArrayList<String> protocolList;
     private String msgUser = "";
     private String msgFriend = "";
     ArrayList<String> msgListCache = new ArrayList<String>();
     UsersController myUserController;
-    public ArrayList<String> start(String block){
+    private ArrayList<String> ArrayMessages = null;
+    public Protocol(ArrayList<String> messageList) {
+        this.ArrayMessages = messageList;
+    }
+    
+    public ArrayList<String> start(String block, String user){
+        this.username = user;
         this.protocolList = readBlock(block.toCharArray());
         ArrayList<String> response = new ArrayList<String>();
         
@@ -68,6 +80,15 @@ public class Protocol {
             MainWindow.ConsoleDebug("PROTOCOL STATUS");
             System.out.println("PROTOCOL STATUS");
             response = getUserStatus(protocolList.get(4),protocolList.get(5));
+        }else if ("CLIENT".equals(protocolList.get(2)) && "CHAT".equals(protocolList.get(3)) && protocolList.size() == 7) {
+            MainWindow.ConsoleDebug("PROTOCOL CHAT");
+            System.out.println("PROTOCOL CHAT");
+            response = sendMessage();
+        }else if ("CLIENT".equals(protocolList.get(2)) && "GET_PHOTO".equals(protocolList.get(3)) && protocolList.size() == 5) {
+            MainWindow.ConsoleDebug("PROTOCOL GET_PHOTO");
+            System.out.println("PROTOCOL GET_PHOTO");
+            response = sendPhoto();
+            System.out.println("RESPONSE SIZE: " + response.size());
         }else{
             MainWindow.ConsoleDebug("PROTOCOL BAD_PKG");
             System.out.println("PROTOCOL BAD_PKG");
@@ -76,7 +97,114 @@ public class Protocol {
         }
         return response;
     }
-
+    private ArrayList<String> sendPhoto(){
+        if (this.myUserController == null) {
+            this.myUserController = new UsersController();
+        }
+        dateTime = sdf.format(new Timestamp(System.currentTimeMillis()));
+        ArrayList<String> arrayLines = new ArrayList<String>();
+        ArrayList<String> encodeLines = new ArrayList<String>();
+        String line = "";
+        int cont = 0, totalPkg = 0;
+        //Lectura de fichero a ArrayList de String len 512chars
+        try(FileInputStream input=new FileInputStream(".\\data\\" + protocolList.get(4) + "\\" + protocolList.get(4) + ".jpg")){
+            int valor = input.read();
+            while(valor!=-1){
+                if (cont > 511) {
+                    arrayLines.add(line);
+                    line = "";
+                    cont = 0;
+                }
+                line += (char)valor;
+                valor=input.read();
+                cont++;
+                totalPkg++;
+            }
+            if (cont > 0) {
+                arrayLines.add(line);
+                cont = 0;
+            }
+            System.out.println("SIZE OF PICTURE: " + totalPkg);
+        } catch (FileNotFoundException ex) {
+            System.out.println("No existe una foto. Cargando foto por defecto...");
+            MainWindow.ConsoleDebug("No existe una foto. Cargando foto por defecto...");
+            //arrayLines = defaultPhoto();
+        } catch (IOException ex) {
+            Logger.getLogger(Protocol.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        encodeLines.add(protocolVersion + "#" + dateTime + "#SERVER#" + "STARTING_MULTIMEDIA_TRANSMISSION_TO#" + username);
+        for (String s : arrayLines) {
+            encodeLines.add(constructPhoto(Base64.getEncoder().encodeToString(s.getBytes()),totalPkg));
+        }
+        System.out.println("EncodeLines SIZE: " + encodeLines) ;
+        //PROTOCOLCRISTOMESSENGER1.0#FECHA/HORA#SERVER#ENDING_MULTIMEDIA_TRANSMISSION#<LOGIN_CLIENTE>
+        encodeLines.add(protocolVersion + "#" + dateTime + "#SERVER#ENDING_MULTIMEDIA_TRANSMISSION#" + username);
+        return encodeLines;
+    }
+    private ArrayList<String> defaultPhoto(){
+        ArrayList<String> arrayLines = new ArrayList<String>();
+        String line = "";
+        int cont = 0;
+        try(FileInputStream input=new FileInputStream(".\\data\\default.jpg")){
+            int valor = input.read();
+            while(valor!=-1){
+                if (cont > 511) {
+                    arrayLines.add(line);
+                    line = "";
+                    cont = 0;
+                }
+                line += (char)valor;
+                valor=input.read();
+                cont++;
+            }
+            if (cont > 0) {
+                arrayLines.add(line);
+                cont = 0;
+            }
+        } catch (FileNotFoundException ex) {
+            Logger.getLogger(Protocol.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (IOException ex) {
+            Logger.getLogger(Protocol.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return arrayLines;
+    }
+    private String constructPhoto(String photoLine, int totalPkg){
+        //PROTOCOLCRISTOMESSENGER1.0#FECHA/HORA#SERVER#RESPONSE_MULTIMEDIA#<LOGIN_CLIENTE>#<TOTAL_BYTES_MULTIMEDIA>#<SIZE_PACKET_MULTIMEDIA>#@512BYTES_FOTO
+        String line = protocolVersion + "#" + dateTime + "#SERVER#" + "RESPONSE_MULTIMEDIA#" + 
+                protocolList.get(4) + "#" + totalPkg + "#" + photoLine.length() + "#" + photoLine;
+        return line;
+    }
+    private ArrayList<String> sendMessage(){
+        if (this.myUserController == null) {
+            this.myUserController = new UsersController();
+        }
+        dateTime = sdf.format(new Timestamp(System.currentTimeMillis()));
+        ArrayList<String> msgList = new ArrayList<String>();
+        Message msg = new Message();
+        msg.setDate(protocolList.get(1));
+        msg.setText(protocolList.get(6));
+        msg.setTransmitter(protocolList.get(4));
+        msg.setReceiver(protocolList.get(5));
+        if (this.myUserController.sendMessage(msg)) {
+            msgList.add(protocolVersion + "#" + dateTime + "#SERVER#" + "CHAT#" + 
+                msg.getTransmitter() + "#" + msg.getReceiver() + "#MESSAGE_SUCCESFULLY_PROCESSED#" + msg.getDate() );
+            //PROTOCOLCRISTOMESSENGER1.0#FECHA/HORA#SERVER#CHAT#<LOGIN_ORIG#<LOGIN_DEST>#<MESSAGE>#TIMESTAMP
+                ArrayMessages.add(protocolVersion + "#" + dateTime + "#SERVER#" + "CHAT#" + 
+                msg.getTransmitter() + "#" + msg.getReceiver() + "#" + msg.getText() + "#" + msg.getDate());
+        }else{
+            msgList.add(protocolVersion + "#" + dateTime + "#SERVER#" + "CHAT#" + 
+                "#FORBIDDEN_CHAT#");
+        }
+        return msgList;
+    }
+    public boolean checkMessageReceived(String block){
+        String[] result = block.split("#");
+        boolean check = false;
+        if (result.length == 7 && "CHAT".equals(result[3]) && "RECEIVED_MESSAGE".equals(result[4])) {
+            check = true;
+        }
+        return check;
+    }
     public ArrayList<String> readBlock(char[] block){
         ArrayList<String> blockList = new ArrayList();
         String acumulador = "";
@@ -130,18 +258,18 @@ public class Protocol {
         ArrayList<String> result = new ArrayList<String>();
         this.myUserController = new UsersController();
         this.username = protocolList.get(4);
-        this.password = protocolList.get(5);
         dateTime = sdf.format(new Timestamp(System.currentTimeMillis()));
         MainWindow.ConsoleDebug("Version: " + protocolList.get(0));
         System.out.println("Version: " + protocolList.get(0));
         MainWindow.ConsoleDebug("User: " + username);
         System.out.println("User: " + username);
-        MainWindow.ConsoleDebug("Pass: " + password);
-        System.out.println("Pass: " + password);
-        if (myUserController.loginUser(username, password)) {
+        MainWindow.ConsoleDebug("Pass: " + protocolList.get(5));
+        System.out.println("Pass: " + protocolList.get(5));
+        if (myUserController.loginUser(username, protocolList.get(5))) {
             result.add(this.protocolVersion + "#" + dateTime + "#SERVER#LOGIN_CORRECT#" + username + getFriends());
         }else{
             result.add(this.protocolVersion + "#" + dateTime + "#SERVER#ERROR#BAD_LOGIN");
+            this.username = "";
         }
         MainWindow.ConsoleDebug(result.get(0));
         System.out.println(result);

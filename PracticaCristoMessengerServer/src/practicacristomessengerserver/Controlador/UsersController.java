@@ -85,15 +85,15 @@ public class UsersController {
         //WindowChat.setSysLogs("Amigos cargados: " + friendList.size());
         return friendList;
     }
-    /*
-    public void sendMessage(Message msg){
-        WindowChat.setSysLogs("Valores del mensage Transmitter: " + msg.getTransmitter());
-        WindowChat.setSysLogs("Valores del mensage Receiver: " + msg.getReceiver());
-        WindowChat.setSysLogs("Valores del mensage Text: " + msg.getText());
-        UsersModel myUserModel = new UsersModel();
-        myUserModel.insertMessage(msg);
-        WindowChat.setSysLogs("Mensaje insertado...");
-    }*/
+    public boolean sendMessage(Message msg){
+        System.out.println("Valores del mensage Transmitter: " + msg.getTransmitter());
+        System.out.println("Valores del mensage Receiver: " + msg.getReceiver());
+        System.out.println("Valores del mensage Text: " + msg.getText());
+        System.out.println("Valores del mensage Date: " + msg.getDate());
+        /*UsersModel myUserModel = new UsersModel();
+        return myUserModel.insertMessage(msg);*/
+        return true;
+    }
     public void sendUser(User usr){
         UsersModel myUserModel = new UsersModel();
         myUserModel.insertUser(usr);

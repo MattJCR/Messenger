@@ -294,22 +294,24 @@ public class UsersModel extends DatabaseModel{
         return myMessageList;
     }
     
-    /*
-    public void insertMessage(Message msg){
-        this.query = "INSERT INTO cristomessenger.message VALUES ('" + msg.getTransmitter() + "','"
-                + msg.getReceiver() + "',DATE_FORMAT(NOW(), '%d %m %Y'),DATE_FORMAT(NOW(),'%H:%i:%S'),0,1,'"
-                + msg.getText() + "')";
-        this.ConnectDatabase();
-        WindowChat.setSysLogs("Insertando mensaje...");
-        this.QuerySQLUpdate();
-        if (this.stmt != null) { 
-            try {
-                this.stmt.close();
-            } catch (SQLException ex) {
-                Logger.getLogger(UsersModel.class.getName()).log(Level.SEVERE, null, ex);
+    public boolean insertMessage(Message msg){
+        boolean check = false;
+        if (checkIsFriend(msg.getTransmitter(),msg.getReceiver())) {
+            this.query = "INSERT INTO cristomessenger.message VALUES ('" + msg.getTransmitter() + "','"
+                + msg.getReceiver() + "'" + msg.getDate() + "',0,1,'" + msg.getText() + "');";
+            this.ConnectDatabase();
+            this.QuerySQLUpdate();
+            if (this.stmt != null) { 
+                try {
+                    this.stmt.close();
+                } catch (SQLException ex) {
+                    Logger.getLogger(UsersModel.class.getName()).log(Level.SEVERE, null, ex);
+                }
             }
+            check = true;
         }
-    }*/
+        return check;
+    }
     public void insertUser(User usr){
         String status = "";
         if (usr.getState()) {
