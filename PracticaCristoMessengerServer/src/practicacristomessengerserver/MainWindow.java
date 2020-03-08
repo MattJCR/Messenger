@@ -8,6 +8,8 @@ package practicacristomessengerserver;
 import practicacristomessengerserver.Controlador.Server;
 import java.io.IOException;
 import java.net.ServerSocket;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -21,13 +23,26 @@ public class MainWindow extends javax.swing.JFrame {
      * Creates new form MainWindow
      */
     public Server server;
+    private static Lock mutex;
     private int portNumber;
     public static boolean MSG_BIENVENIDAD = false;
     public MainWindow() {
         initComponents();
+        mutex = new ReentrantLock();
     }
     public static void ConsoleDebug(String text){
-        MainWindow.jTextAreaDebug.setText(MainWindow.jTextAreaDebug.getText() + text + "\n");
+        mutex.lock();
+        try {
+            if (MainWindow.jTextAreaDebug.getText().length() >= 500000) {
+                MainWindow.jTextAreaDebug.removeAll();
+                MainWindow.jTextAreaDebug.setText("WARNING: Java heap space. The window has been cleaned!");
+            }
+            MainWindow.jTextAreaDebug.setText(MainWindow.jTextAreaDebug.getText() + text + "\n");
+            MainWindow.jTextAreaDebug.setSelectionStart(Integer.MAX_VALUE/2);
+            MainWindow.labelSizeOfChars.setText(MainWindow.jTextAreaDebug.getText().length() + "/500000");
+        } finally {
+            mutex.unlock();
+        }
     }
 
     /**
@@ -46,6 +61,7 @@ public class MainWindow extends javax.swing.JFrame {
         jTextNumberPort = new javax.swing.JTextField();
         jLabel1 = new javax.swing.JLabel();
         jButtonCheck = new javax.swing.JButton();
+        labelSizeOfChars = new java.awt.Label();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
@@ -68,6 +84,7 @@ public class MainWindow extends javax.swing.JFrame {
         jTextAreaDebug.setColumns(20);
         jTextAreaDebug.setFont(new java.awt.Font("Consolas", 0, 9)); // NOI18N
         jTextAreaDebug.setRows(5);
+        jTextAreaDebug.setCursor(new java.awt.Cursor(java.awt.Cursor.TEXT_CURSOR));
         jScrollPane1.setViewportView(jTextAreaDebug);
 
         jTextNumberPort.setText("39999");
@@ -81,6 +98,9 @@ public class MainWindow extends javax.swing.JFrame {
                 jButtonCheckActionPerformed(evt);
             }
         });
+
+        labelSizeOfChars.setAlignment(java.awt.Label.RIGHT);
+        labelSizeOfChars.setText("0/500000");
 
         javax.swing.GroupLayout jPanel1Layout = new javax.swing.GroupLayout(jPanel1);
         jPanel1.setLayout(jPanel1Layout);
@@ -99,14 +119,18 @@ public class MainWindow extends javax.swing.JFrame {
                         .addGap(18, 18, 18)
                         .addComponent(jButtonRun, javax.swing.GroupLayout.PREFERRED_SIZE, 65, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(18, 18, 18)
-                        .addComponent(jButtonStop)))
+                        .addComponent(jButtonStop))
+                    .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel1Layout.createSequentialGroup()
+                        .addGap(0, 0, Short.MAX_VALUE)
+                        .addComponent(labelSizeOfChars, javax.swing.GroupLayout.PREFERRED_SIZE, 158, javax.swing.GroupLayout.PREFERRED_SIZE)))
                 .addContainerGap())
         );
         jPanel1Layout.setVerticalGroup(
             jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel1Layout.createSequentialGroup()
-                .addContainerGap()
-                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 424, Short.MAX_VALUE)
+                .addComponent(labelSizeOfChars, javax.swing.GroupLayout.PREFERRED_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
+                .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 407, Short.MAX_VALUE)
                 .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.RELATED)
                 .addGroup(jPanel1Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
                     .addComponent(jButtonStop)
@@ -185,5 +209,6 @@ public class MainWindow extends javax.swing.JFrame {
     private javax.swing.JTabbedPane jTabbedPane1;
     public static javax.swing.JTextArea jTextAreaDebug;
     private javax.swing.JTextField jTextNumberPort;
+    private static java.awt.Label labelSizeOfChars;
     // End of variables declaration//GEN-END:variables
 }

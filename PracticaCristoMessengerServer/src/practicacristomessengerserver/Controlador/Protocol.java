@@ -28,72 +28,112 @@ public class Protocol {
     private String dateTime = "";
     private final String protocolVersion = "PROTOCOLCRISTOMESSENGER1.0";
     public String username = "";
+    private int friendListSize = 0;
+    private int friendStatusUpdateTimes = 0;
     private ArrayList<String> protocolList;
     private String msgUser = "";
     private String msgFriend = "";
     ArrayList<String> msgListCache = new ArrayList<String>();
     UsersController myUserController;
     private ArrayList<String> ArrayMessages = null;
-    public Protocol(ArrayList<String> messageList) {
-        this.ArrayMessages = messageList;
+    private KKMultiServerThread clientSocket = null;
+    public Protocol(KKMultiServerThread server) {
+        clientSocket = server;
+        ArrayMessages = clientSocket.inputMessages;
     }
     
     public ArrayList<String> start(String block, String user){
+        this.clientSocket.canUse = false;
         this.username = user;
         this.protocolList = readBlock(block.toCharArray());
         ArrayList<String> response = new ArrayList<String>();
-        
+        if (friendStatusUpdateTimes > 0) {
+            MainWindow.ConsoleDebug(username + "->PROTOCOL_WAITING_STATUS_FRIENDS " + friendStatusUpdateTimes + "/" + friendListSize);
+            System.out.println(username + "->PROTOCOL_WAITING_STATUS_FRIENDS " + friendStatusUpdateTimes + "/" + friendListSize);
+        }
+        MainWindow.ConsoleDebug("CLIENT[" + this.username + "]: " + block);
+        System.out.println("CLIENT[" + this.username + "]: " + block);
+        /*MainWindow.ConsoleDebug(username + "->PROTOCOL_B: " + block);
+        System.out.println(username + "->PROTOCOL_B: " + block);
         for (String p :protocolList) {
             System.out.println(p);
         }
         System.out.println("protocolList SIZE: " + protocolList.size());
-        
+        */
         if ("CLIENT".equals(protocolList.get(2)) && "LOGIN".equals(protocolList.get(3)) && protocolList.size() == 6) {
-            MainWindow.ConsoleDebug("PROTOCOL CHECK LOG.");
-            System.out.println("PROTOCOL CHECK LOG.");
+            //MainWindow.ConsoleDebug("PROTOCOL CHECK LOG.");
+            //System.out.println("PROTOCOL CHECK LOG.");
             response = checkLog();
+            if (friendStatusUpdateTimes == 0) {
+                this.clientSocket.canUse = true;
+            }
         }else if ("CLIENT".equals(protocolList.get(2)) && "MSGS".equals(protocolList.get(3)) && protocolList.size() == 7) {
-            MainWindow.ConsoleDebug("PROTOCOL GET MESSAGES");
-            System.out.println("PROTOCOL GET MESSAGES");
+            //MainWindow.ConsoleDebug("PROTOCOL GET MESSAGES");
+            //System.out.println("PROTOCOL GET MESSAGES");
             msgListCache = getMenssages(protocolList.get(4),protocolList.get(5),protocolList.get(6));
             response.add(msgListCache.get(0));
             msgUser = protocolList.get(4);
             msgFriend = protocolList.get(5);
         }else if ("CLIENT".equals(protocolList.get(2)) && "MSGS".equals(protocolList.get(3)) && 
                 "OK_SEND!".equals(protocolList.get(4)) && protocolList.size() == 5 && !"".equals(msgUser) && !"".equals(msgFriend)) {
-            MainWindow.ConsoleDebug("PROTOCOL OK_SEND");
-            System.out.println("PROTOCOL OK_SEND");
+            //MainWindow.ConsoleDebug("PROTOCOL OK_SEND");
+            //System.out.println("PROTOCOL OK_SEND");
             msgListCache.remove(0);
             response = msgListCache;
         }else if ("CLIENT".equals(protocolList.get(2)) && "MSGS".equals(protocolList.get(3)) && "ALL_RECEIVED".equals(protocolList.get(4)) && protocolList.size() == 5) {
-            MainWindow.ConsoleDebug("PROTOCOL ALL_RECEIVED");
-            System.out.println("PROTOCOL ALL_RECEIVED");
+            //MainWindow.ConsoleDebug("PROTOCOL ALL_RECEIVED");
+            //System.out.println("PROTOCOL ALL_RECEIVED");
             response.clear();
             msgListCache.clear();
             msgUser = "";
             msgFriend = "";
+            if (friendStatusUpdateTimes == 0) {
+                this.clientSocket.canUse = true;
+            }
         }else if ("CLIENT".equals(protocolList.get(2)) && "ALLDATA_USER".equals(protocolList.get(3)) && protocolList.size() == 5) {
-            MainWindow.ConsoleDebug("PROTOCOL ALLDATA_USER");
-            System.out.println("PROTOCOL ALLDATA_USER");
+            //MainWindow.ConsoleDebug("PROTOCOL ALLDATA_USER");
+            //System.out.println("PROTOCOL ALLDATA_USER");
             response = allDataUser(protocolList.get(4));
+            this.clientSocket.canUse = true;
         }else if ("CLIENT".equals(protocolList.get(2)) && "STATUS".equals(protocolList.get(3)) && protocolList.size() == 6) {
-            MainWindow.ConsoleDebug("PROTOCOL STATUS");
-            System.out.println("PROTOCOL STATUS");
+            //MainWindow.ConsoleDebug("PROTOCOL STATUS");
+            //System.out.println("PROTOCOL STATUS");
             response = getUserStatus(protocolList.get(4),protocolList.get(5));
-        }else if ("CLIENT".equals(protocolList.get(2)) && "CHAT".equals(protocolList.get(3)) && protocolList.size() == 7) {
-            MainWindow.ConsoleDebug("PROTOCOL CHAT");
-            System.out.println("PROTOCOL CHAT");
+            friendStatusUpdateTimes++;
+            if (friendStatusUpdateTimes >= friendListSize) {
+                this.clientSocket.canUse = true;
+                friendStatusUpdateTimes = 0;
+            }
+        }else if ("CLIENT".equals(protocolList.get(2)) && "CHAT".equals(protocolList.get(3)) && username.equals(protocolList.get(4)) && protocolList.size() == 7) {
+            //MainWindow.ConsoleDebug("PROTOCOL CHAT");
+            //System.out.println("PROTOCOL CHAT");
             response = sendMessage();
+            if (friendStatusUpdateTimes == 0) {
+                this.clientSocket.canUse = true;
+            }
         }else if ("CLIENT".equals(protocolList.get(2)) && "GET_PHOTO".equals(protocolList.get(3)) && protocolList.size() == 5) {
-            MainWindow.ConsoleDebug("PROTOCOL GET_PHOTO");
-            System.out.println("PROTOCOL GET_PHOTO");
+            //MainWindow.ConsoleDebug("PROTOCOL GET_PHOTO");
+            //System.out.println("PROTOCOL GET_PHOTO");
             response = sendPhoto();
             System.out.println("RESPONSE SIZE: " + response.size());
+        }else if (protocolList.size() == 5 && "PHOTO_RECEIVED".equals(protocolList.get(3))) {
+            this.clientSocket.canUse = true;
+        }else if ("CLIENT".equals(protocolList.get(2)) && "CHAT".equals(protocolList.get(3)) && "RECEIVED_MESSAGE".equals(protocolList.get(4)) && protocolList.size() == 7) {
+            //MainWindow.ConsoleDebug("PROTOCOL RECEIVED_MESSAGE");
+            //System.out.println("PROTOCOL RECEIVED_MESSAGE");
+            //response = checkMessageReceived();
+            checkMessageReceived();
+            if (friendStatusUpdateTimes == 0) {
+                this.clientSocket.canUse = true;
+            }
         }else{
-            MainWindow.ConsoleDebug("PROTOCOL BAD_PKG");
-            System.out.println("PROTOCOL BAD_PKG");
+            //MainWindow.ConsoleDebug("PROTOCOL BAD_PKG");
+            //System.out.println("PROTOCOL BAD_PKG");
             dateTime = sdf.format(new Timestamp(System.currentTimeMillis()));
             response.add(protocolList + "#" + dateTime + "#SERVER#BAD_PKG");
+            if (friendStatusUpdateTimes == 0) {
+                this.clientSocket.canUse = true;
+            }
         }
         return response;
     }
@@ -124,7 +164,7 @@ public class Protocol {
                 arrayLines.add(line);
                 cont = 0;
             }
-            System.out.println("SIZE OF PICTURE: " + totalPkg);
+            //System.out.println("SIZE OF PICTURE: " + totalPkg);
         } catch (FileNotFoundException ex) {
             System.out.println("No existe una foto. Cargando foto por defecto...");
             MainWindow.ConsoleDebug("No existe una foto. Cargando foto por defecto...");
@@ -136,7 +176,7 @@ public class Protocol {
         for (String s : arrayLines) {
             encodeLines.add(constructPhoto(Base64.getEncoder().encodeToString(s.getBytes()),totalPkg));
         }
-        System.out.println("EncodeLines SIZE: " + encodeLines) ;
+        //System.out.println("EncodeLines SIZE: " + encodeLines) ;
         //PROTOCOLCRISTOMESSENGER1.0#FECHA/HORA#SERVER#ENDING_MULTIMEDIA_TRANSMISSION#<LOGIN_CLIENTE>
         encodeLines.add(protocolVersion + "#" + dateTime + "#SERVER#ENDING_MULTIMEDIA_TRANSMISSION#" + username);
         return encodeLines;
@@ -188,7 +228,6 @@ public class Protocol {
         if (this.myUserController.sendMessage(msg)) {
             msgList.add(protocolVersion + "#" + dateTime + "#SERVER#" + "CHAT#" + 
                 msg.getTransmitter() + "#" + msg.getReceiver() + "#MESSAGE_SUCCESFULLY_PROCESSED#" + msg.getDate() );
-            //PROTOCOLCRISTOMESSENGER1.0#FECHA/HORA#SERVER#CHAT#<LOGIN_ORIG#<LOGIN_DEST>#<MESSAGE>#TIMESTAMP
                 ArrayMessages.add(protocolVersion + "#" + dateTime + "#SERVER#" + "CHAT#" + 
                 msg.getTransmitter() + "#" + msg.getReceiver() + "#" + msg.getText() + "#" + msg.getDate());
         }else{
@@ -197,13 +236,22 @@ public class Protocol {
         }
         return msgList;
     }
-    public boolean checkMessageReceived(String block){
-        String[] result = block.split("#");
-        boolean check = false;
-        if (result.length == 7 && "CHAT".equals(result[3]) && "RECEIVED_MESSAGE".equals(result[4])) {
-            check = true;
+    public ArrayList<String> checkMessageReceived(){
+        if (this.myUserController == null) {
+            this.myUserController = new UsersController();
         }
-        return check;
+        ArrayList<String> result = new ArrayList<String>();
+        this.myUserController.updateMessageRead(getReadMessage(protocolList));
+        //PROTOCOLCRISTOMESSENGER1.0#FECHA/HORA#SERVER#CHAT#<LOGIN_ORIG#<LOGIN_DEST>#MESSAGE_SUCCESFULLY_PROCESSED#TIMESTAMP
+        ArrayMessages.add(protocolVersion + "#" + dateTime + "#SERVER#CHAT#" + 
+                username + "#" + protocolList.get(5) + "#MESSAGE_SUCCESFULLY_PROCESSED#" + protocolList.get(6));
+        return result;
+    }
+    private Message getReadMessage(ArrayList<String> message){
+        Message msg = new Message();
+        msg.setDate(message.get(6));
+        msg.setTransmitter(message.get(5));
+        return msg;
     }
     public ArrayList<String> readBlock(char[] block){
         ArrayList<String> blockList = new ArrayList();
@@ -239,10 +287,11 @@ public class Protocol {
     private String getFriends(){
         String acumulador = "";
         this.myUserController = new UsersController();
-        System.out.println("USERNAME: " + username);
+        //System.out.println("USERNAME: " + username);
         ArrayList<User> usersList = myUserController.loadFriends(username);
-        System.out.println("USERLIST SIZE: "+ usersList.size());
+        //System.out.println("USERLIST SIZE: "+ usersList.size());
         acumulador += "#FRIENDS#" + usersList.size();
+        friendListSize = usersList.size();
         for (User u : usersList) {
             //acumulador += "#" + u.getName();
             acumulador += "#" + u.getId();
@@ -259,20 +308,21 @@ public class Protocol {
         this.myUserController = new UsersController();
         this.username = protocolList.get(4);
         dateTime = sdf.format(new Timestamp(System.currentTimeMillis()));
-        MainWindow.ConsoleDebug("Version: " + protocolList.get(0));
+        /*MainWindow.ConsoleDebug("Version: " + protocolList.get(0));
         System.out.println("Version: " + protocolList.get(0));
         MainWindow.ConsoleDebug("User: " + username);
         System.out.println("User: " + username);
         MainWindow.ConsoleDebug("Pass: " + protocolList.get(5));
         System.out.println("Pass: " + protocolList.get(5));
+        */
         if (myUserController.loginUser(username, protocolList.get(5))) {
             result.add(this.protocolVersion + "#" + dateTime + "#SERVER#LOGIN_CORRECT#" + username + getFriends());
         }else{
             result.add(this.protocolVersion + "#" + dateTime + "#SERVER#ERROR#BAD_LOGIN");
             this.username = "";
         }
-        MainWindow.ConsoleDebug(result.get(0));
-        System.out.println(result);
+        //MainWindow.ConsoleDebug(result.get(0));
+        //System.out.println(result);
         return result;
     }
     private ArrayList<String> allDataUser(String friend){
@@ -281,12 +331,12 @@ public class Protocol {
             this.myUserController = new UsersController();
         }
         ArrayList<String> result = new ArrayList<String>();
-        System.out.println("Check friendship...");
+        //System.out.println("Check friendship...");
         if (this.myUserController.isFriend(username, friend)) {
             user = this.myUserController.getInfoUser(friend);
-            System.out.println("True");
+            //System.out.println("True");
         }else{
-            System.out.println("False");
+            //System.out.println("False");
         }
         dateTime = sdf.format(new Timestamp(System.currentTimeMillis()));
         result.add(protocolVersion + "#" + dateTime + "#SERVER#" + "ALLDATA_USER#" + 
@@ -306,5 +356,16 @@ public class Protocol {
         result.add(protocolVersion + "#" + dateTime + "#SERVER#" + 
                     "STATUS#" + idFriend + "#" + status);
         return result;
+    }
+    public void unLog(){
+        if (this.myUserController == null) {
+            this.myUserController = new UsersController();
+        }
+        this.myUserController.changeStatusUser(username,0);
+    }
+    private void checkTransmissionMultimadia(String line){
+        if (line.split("#").length == 5 && "PHOTO_RECEIVED".equals(line.split("#")[3])) {
+            this.clientSocket.canUse = true;
+        }
     }
 }

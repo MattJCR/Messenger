@@ -34,7 +34,7 @@ public class UsersModel extends DatabaseModel{
                 UserAux.setFirstSurname(this.rs.getString("surname1"));
                 UserAux.setSecondSurname(this.rs.getString("surname2"));
                 UserAux.setPhoto(this.rs.getString("photo"));
-                if (this.rs.getString("state").equals("0")) {
+                if (this.rs.getString("state").equals("1")) {
                     UserAux.setState(true);
                 }else{
                     UserAux.setState(false);
@@ -69,7 +69,7 @@ public class UsersModel extends DatabaseModel{
                 UserAux.setFirstSurname(this.rs.getString("surname1"));
                 UserAux.setSecondSurname(this.rs.getString("surname2"));
                 UserAux.setPhoto(this.rs.getString("photo"));
-                if (this.rs.getString("state").equals("0")) {
+                if (this.rs.getString("state").equals("1")) {
                     UserAux.setState(true);
                 }else{
                     UserAux.setState(false);
@@ -103,13 +103,13 @@ public class UsersModel extends DatabaseModel{
                 user.setFirstSurname(this.rs.getString("surname1"));
                 user.setSecondSurname(this.rs.getString("surname2"));
                 user.setPhoto(this.rs.getString("photo"));
-                if (this.rs.getString("state").equals("0")) {
+                if (this.rs.getString("state").equals("1")) {
                     user.setState(true);
                 }else{
                     user.setState(false);
                 }
             }
-            System.out.println("BD user" + rs.getFetchSize() + ": " + user.getId() );
+            //System.out.println("BD user" + rs.getFetchSize() + ": " + user.getId() );
         } catch (SQLException e ) {
             System.out.println(e.getMessage());
         }  finally {
@@ -162,7 +162,7 @@ public class UsersModel extends DatabaseModel{
             this.ConnectDatabase();
             //WindowChat.setSysLogs("Obteniendo amigos...");
             this.QuerySQLExecute();
-            System.out.println("QUERY SIZE: " + rs.getFetchSize());
+            //System.out.println("QUERY SIZE: " + rs.getFetchSize());
             while (this.rs.next()) {
                 User UserAux = new User();
                 UserAux.setId(this.rs.getString("id_user"));
@@ -170,7 +170,7 @@ public class UsersModel extends DatabaseModel{
                 UserAux.setFirstSurname(this.rs.getString("surname1"));
                 UserAux.setSecondSurname(this.rs.getString("surname2"));
                 UserAux.setPhoto(this.rs.getString("photo"));
-                if ("0".equals(this.rs.getString("state"))) {
+                if ("1".equals(this.rs.getString("state"))) {
                     UserAux.setState(true);
                 }else{
                     UserAux.setState(false);
@@ -192,7 +192,7 @@ public class UsersModel extends DatabaseModel{
     }
     
     public ArrayList<Message> getMessages(String logUser, String friendUser, String date){
-        System.out.println("getMessagesDate.length(): " + date.length());
+        //System.out.println("getMessagesDate.length(): " + date.length());
         String dateAux = date.split(" ")[0];
         String lastDay = sdf.format(Timestamp.valueOf(date).getTime() - (24*60*60*1000));
         lastDay = lastDay.split(" ")[0];
@@ -200,8 +200,8 @@ public class UsersModel extends DatabaseModel{
         this.query  = "SELECT * FROM cristomessenger.message\n" +
         "WHERE ((id_user_orig = \"" + logUser + "\" and id_user_dest = \"" + friendUser + "\") or ("
         + "id_user_orig = \"" + friendUser + "\" and id_user_dest = \"" + logUser + "\")) and "
-        + "datetime > \"" + lastDay + "%\" and " + "datetime < \"" + dateAux + "%\" order by datetime asc;";
-        System.out.println("getMessagesDate: " + date);
+        + "datetime >= \"" + lastDay + "%\" and " + "datetime < \"" + date + "\" order by datetime asc;";
+        //System.out.println("getMessagesDate: " + date);
         try {
             this.ConnectDatabase();
             this.QuerySQLExecute();
@@ -213,7 +213,7 @@ public class UsersModel extends DatabaseModel{
                 MessageAux.setDate(this.rs.getString("datetime"));
                 myMessageList.add(MessageAux);
             }
-            System.out.println("getMessages: " + myMessageList.size());
+            //System.out.println("getMessages: " + myMessageList.size());
         } catch (SQLException e ) {
             System.out.println(e.getMessage());
         }  finally {
@@ -226,7 +226,7 @@ public class UsersModel extends DatabaseModel{
             }
         }
         if (myMessageList.isEmpty()) {
-            myMessageList = getTop10Messages(logUser,friendUser,date);
+            //myMessageList = getTop10Messages(logUser,friendUser,date);
         }
         return myMessageList;
     }
@@ -236,7 +236,7 @@ public class UsersModel extends DatabaseModel{
         this.query  = "SELECT COUNT(*) as number FROM cristomessenger.message\n" +
         "WHERE ((id_user_orig = \"" + logUser + "\" and id_user_dest = \"" + friendUser + "\") or ("
         + "id_user_orig = \"" + friendUser + "\" and id_user_dest = \""  + logUser + "\")) and "
-        + "datetime < \"" + dateAux + "%\";";
+        + "datetime < \"" + date + "\";";
         try {
             this.ConnectDatabase();
             this.QuerySQLExecute();
@@ -244,7 +244,7 @@ public class UsersModel extends DatabaseModel{
                 number = Integer.parseInt(this.rs.getString("number"));
             }
         } catch (SQLException e ) {
-            System.out.println(e.getMessage());
+            //System.out.println(e.getMessage());
         }  finally {
             if (this.stmt != null) { 
                 try {
@@ -254,14 +254,14 @@ public class UsersModel extends DatabaseModel{
                 }
             }
         }
-        System.out.println("Value of getSizeMessages: " + number);
+        //System.out.println("Value of getSizeMessages: " + number);
         return number;
     }
     public ArrayList<Message> getTop10Messages(String logUser, String friendUser, String date){
-        System.out.println("getMessagesDate.length(): " + date.length());
+        //System.out.println("getMessagesDate.length(): " + date.length());
         //String dateAux = date.split(" ")[0];
         ArrayList<Message> myMessageList = new ArrayList<>();
-        System.out.println("getTop10Date: " + date);
+        //System.out.println("getTop10Date: " + date);
         this.query  = "SELECT * FROM cristomessenger.message\n" +
         "WHERE ((id_user_orig = \"" + logUser + "\" and id_user_dest = \"" + friendUser + "\") or ("
         + "id_user_orig = \"" + friendUser + "\" and id_user_dest = \"" + logUser + "\")) and "
@@ -278,7 +278,7 @@ public class UsersModel extends DatabaseModel{
                 MessageAux.setDate(this.rs.getString("datetime"));
                 myMessageList.add(MessageAux);
             }
-            System.out.println("getTop10MSG: " + myMessageList.size());
+            //System.out.println("getTop10MSG: " + myMessageList.size());
         } catch (SQLException e ) {
             System.out.println(e.getMessage());
         }  finally {
@@ -298,7 +298,7 @@ public class UsersModel extends DatabaseModel{
         boolean check = false;
         if (checkIsFriend(msg.getTransmitter(),msg.getReceiver())) {
             this.query = "INSERT INTO cristomessenger.message VALUES ('" + msg.getTransmitter() + "','"
-                + msg.getReceiver() + "'" + msg.getDate() + "',0,1,'" + msg.getText() + "');";
+                + msg.getReceiver() + "','" + msg.getDate() + "',0,1,'" + msg.getText() + "');";
             this.ConnectDatabase();
             this.QuerySQLUpdate();
             if (this.stmt != null) { 
@@ -312,12 +312,30 @@ public class UsersModel extends DatabaseModel{
         }
         return check;
     }
+    public void updateMessageRead(Message msg){
+        this.query  = "UPDATE cristomessenger.message SET read_msg ='1' "
+                + "WHERE datetime = '" + msg.getDate() + "' and id_user_orig = '" + msg.getTransmitter() + "';";
+        try {
+            this.ConnectDatabase();
+            this.QuerySQLUpdate();
+        } catch ( Exception e ) {
+            System.out.println(e.getMessage());
+        }  finally {
+            if (this.stmt != null) { 
+                try {
+                    this.stmt.close();
+                } catch (SQLException ex) {
+                    Logger.getLogger(UsersModel.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+    }
     public void insertUser(User usr){
         String status = "";
         if (usr.getState()) {
-            status = "0";
-        }else{
             status = "1";
+        }else{
+            status = "0";
         }
         this.query = "INSERT INTO cristomessenger.user VALUES ('" + usr.getId() + 
                 "','" + usr.getName() + "','" + usr.getPassword() + "','" + usr.getFirstSurname() + 
@@ -350,8 +368,31 @@ public class UsersModel extends DatabaseModel{
                 }
             }
         }
-        System.out.println("Status of " + idUser + ": " + status);
+        //System.out.println("Status of " + idUser + ": " + status);
     }
-
+    public ArrayList<String> getAllUsers(){
+        ArrayList<String> users = new ArrayList<>();
+        this.query  = "SELECT id_user, state FROM cristomessenger.user";
+        try {
+            this.ConnectDatabase();
+            //WindowChat.setSysLogs("Obteniendo amigos...");
+            this.QuerySQLExecute();
+            //System.out.println("QUERY SIZE: " + rs.getFetchSize());
+            while (this.rs.next()) {
+                users.add(this.rs.getString("id_user") + "#" + this.rs.getString("state"));
+            }
+        } catch (SQLException e ) {
+            System.out.println(e.getMessage());
+        }  finally {
+            if (this.stmt != null) { 
+                try {
+                    this.stmt.close();
+                } catch (SQLException ex) {
+                    Logger.getLogger(UsersModel.class.getName()).log(Level.SEVERE, null, ex);
+                }
+            }
+        }
+        return users;
+    }
     
 }

@@ -28,6 +28,8 @@ public class Server extends Thread{
     private ArrayList<KKMultiServerThread> arrayServerThread = new ArrayList();
     private boolean listening;
     private boolean checkStatus = true;
+    private UsersController myServerUserController = new UsersController();
+    Thread thread;
     public Server(int port) {
         this.portNumber = port;
     }
@@ -35,11 +37,17 @@ public class Server extends Thread{
     public void StopServer(){
             listening = false;
             for (KKMultiServerThread hebra : arrayServerThread) {
-                hebra.stopHebra();
+                try{
+                    hebra.disconnectClient();
+                    hebra.stop();
+                    arrayServerThread.remove(hebra);
+                }catch(Exception ex){
+                    System.out.println("StopServer: " + ex);
+                }  
             }
     }
     public void StatusClient(){
-        Thread thread = new Thread(){
+        this.thread = new Thread(){
         @Override
         public void run(){
             try {
@@ -47,9 +55,9 @@ public class Server extends Thread{
                     for (KKMultiServerThread client : arrayServerThread) {
                         System.out.println("Client " + client.username + ": " + client.getState());
                         MainWindow.ConsoleDebug("Client " + client.username + ": " + client.getState());
-                        if (!"RUNNABLE".equals(client.getState().toString())) {
-                            //client.Disconnect();
+                        if ("TERMINATED".equals(client.getState().toString())) {
                             arrayServerThread.remove(client);
+                            break;
                         }
                     }
                     Thread.sleep(5000);
@@ -61,10 +69,60 @@ public class Server extends Thread{
       };
       thread.start();
     }
+    public void CheckClients(){
+        this.thread = new Thread(){
+        @Override
+        public void run(){
+            try {
+                do {
+                    for (String user : myServerUserController.getAllUsers()) {
+                        boolean check = false;
+                        int count = 0;
+                        for (KKMultiServerThread client : arrayServerThread) {
+                            if (client.username.equals(user.split("#")[0])) {
+                                check = true;
+                                count++;
+                            }
+                        }
+                        if (count > 1) {
+                            for (KKMultiServerThread client : arrayServerThread) {
+                                if (client.username.equals(user.split("#")[0])) {
+                                    client.disconnectClient();
+                                    break;
+                                }
+                            }
+                        }
+                        if (!check && !"0".equals(user.split("#")[1])) {
+                            System.out.println("SERVER: disconnected user " + user.split("#")[0] + ".");
+                            myServerUserController.changeStatusUser(user.split("#")[0],0);
+                        }else if (check && !"1".equals(user.split("#")[1])) {
+                            myServerUserController.changeStatusUser(user.split("#")[0],1);
+                        }
+                    }
+                    Thread.sleep(10000);
+                } while (checkStatus);
+            } catch (InterruptedException ex) {
+                Logger.getLogger(Server.class.getName()).log(Level.SEVERE, null, ex);
+            }
+        }
+      };
+      thread.start();
+    }
     @Override
     public void run(){
         listening = true;
+        System.out.println("USER LIST: ");
+        for (String user : myServerUserController.getAllUsers()) {
+            String status = "DISCONNECTED.";
+            if ("0".equals(user.split("#")[1])) {
+                status = "CONNECTED";
+            }
+            String line = (user.split("#")[0] +  " -> " + status);
+            MainWindow.ConsoleDebug(line);
+            System.out.println(line);
+        }
         StatusClient();
+        CheckClients();
         try (ServerSocket serverSocket = new ServerSocket(portNumber)) { 
             myServerSocket = serverSocket;
             while (listening) {

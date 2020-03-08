@@ -21,61 +21,65 @@ import practicacristomessengerserver.MainWindow;
 public class KKMultiServerThread extends Thread {
     public Lock mutex;
     private Socket socket = null;
-    public String username = "";
+    public String username = "Unlogged";
     public PrintWriter out = null;
     public BufferedReader in = null;
     public ArrayList<String> inputMessages = new ArrayList<String>();
     private ArrayList<KKMultiServerThread> arrayClients = null;
     Protocol p;
+    Thread thread;
+    public boolean canUse = false;
     public KKMultiServerThread(Socket socket, ArrayList<KKMultiServerThread> clients) {
         super("KKMultiServerThread");
         this.socket = socket;
         this.arrayClients = clients;
     }
-    public void stopHebra(){
-        try {
-            socket.close();
-        } catch (IOException ex) {
-            Logger.getLogger(KKMultiServerThread.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
     private void sendMessages(){
         boolean check = false;
         for (KKMultiServerThread client : arrayClients) {
-            //client.out.println("");
-            if (!username.equals(client.username)) {
+            if (this.canUse && client.canUse && !username.equals(client.username)) {
+                client.mutex.lock();
                 MainWindow.ConsoleDebug("TrySend " + username + "->" + client.username + ": " + inputMessages.size());
                 System.out.println("TrySend " + username + "->" + client.username + ": " + inputMessages.size());
                 for (String block : inputMessages) {
+                    System.out.println("TrySend BLOCK: " + block);
                     if (block.split("#")[5].equals(client.username)) {
-                        MainWindow.ConsoleDebug("OK!");
-                        System.out.println("OK!");
+                        MainWindow.ConsoleDebug("SERVER[" + this.username + "]: " + block);
+                        System.out.println("SERVER[" + this.username + "]: " + block);
+                        client.out.println(block);
+                        inputMessages.remove(block);
+                        check = true;
+                        break;
+                    }else if (block.split("#")[4].equals(client.username)) {
+                        MainWindow.ConsoleDebug("SERVER[" + this.username + "]: " + block);
+                        System.out.println("SERVER[" + this.username + "]: " + block);
                         client.out.println(block);
                         inputMessages.remove(block);
                         check = true;
                         break;
                     }
                 }
-            }
-            if (!check) {
-                client.out.println("");
-            }else{
-                break;
+                client.mutex.unlock();
+                if (check) {
+                    break;
+                }
             }
         }
     }
     private void threadMessages(){
-        Thread thread = new Thread(){
+        this.thread = new Thread(){
         @Override
         public void run(){
             try {
                 Thread.sleep(10000);
                 do {
-                    try {
-                        mutex.lock();
-                        sendMessages();
-                    }finally{
-                        mutex.unlock();
+                    if (canUse) {
+                        try {
+                            mutex.lock();
+                            sendMessages();
+                        }finally{
+                            mutex.unlock();
+                        }
                     }
                     Thread.sleep(5000);
                 } while (true);
@@ -85,6 +89,22 @@ public class KKMultiServerThread extends Thread {
         }
       };
       thread.start();
+    }
+    public void disconnectClient(){
+        p.unLog();
+        MainWindow.ConsoleDebug("SERVER[" + this.username + "]: DISCONNECT.");
+        System.out.println("SERVER[" + this.username + "]: DISCONNECT.");
+        try{
+            this.thread.stop();
+            this.socket.close();
+        }catch(Exception e){
+        }
+    }
+    private String secureString(String line){
+        String result = line.replace("\\", "");
+        result = result.replace("'", "");
+        result = result.replace("\"", "");
+        return result;
     }
     @Override
     public void run() {
@@ -97,13 +117,18 @@ public class KKMultiServerThread extends Thread {
                 out.println("Conexión establecidad con " + socket.getLocalAddress());
             }
             String inputLine;
-            p = new Protocol(inputMessages);
+            p = new Protocol(this);
             while ((inputLine = in.readLine()) != null) {
                 try{
                     mutex.lock();
-                    MainWindow.ConsoleDebug("Cliente [" + socket.getInetAddress() + "]: " + inputLine);
-                    System.out.println("Cliente [" + socket.getInetAddress() + "]: " + inputLine);
+                    this.canUse = false;
+                    inputLine = secureString(inputLine);
+                    //MainWindow.ConsoleDebug("Cliente [" + this.username + "]: " + inputLine);
+                    //System.out.println("Cliente [" + this.username + "]: " + inputLine);
                     for (String line : p.start(inputLine,this.username)) {
+                        //p.checkTransmissionMultimadia(line);
+                        MainWindow.ConsoleDebug("SERVER[" + this.username + "]: " + line);
+                        System.out.println("SERVER[" + this.username + "]: " + line);
                         out.println(line);
                         this.username = p.username;
                     }
@@ -118,6 +143,7 @@ public class KKMultiServerThread extends Thread {
             MainWindow.ConsoleDebug("Exception caught when trying to listen on port "
                 + this.socket.getPort() + " or listening for a connection");
             System.out.println(e.getMessage());
+            disconnectClient();
         }
     }
 }
